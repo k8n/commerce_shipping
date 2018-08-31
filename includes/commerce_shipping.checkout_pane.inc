@@ -32,6 +32,12 @@ function commerce_shipping_pane_settings_form($checkout_pane) {
  * Checkout pane callback: builds a shipping quote selection form.
  */
 function commerce_shipping_pane_checkout_form($form, &$form_state, $checkout_pane, $order) {
+  // hack around ajax call not processed by i18n?
+  $lang = array_shift(explode("/", request_path()));
+  $languages = language_list(); // get all languages
+  global $language;
+  $language = $languages[$lang];
+
   // Ensure this include file is loaded when the form is rebuilt from the cache.
   $form_state['build_info']['files']['form'] = drupal_get_path('module', 'commerce_shipping') . '/includes/commerce_shipping.checkout_pane.inc';
 
@@ -146,7 +152,7 @@ function commerce_shipping_pane_checkout_form($form, &$form_state, $checkout_pan
         $message = t('Please supply all of the required information requested above to reveal your shipping options.');
       }
       else {
-        $message = t('No shipping rates found for your order. Please continue the checkout process.');
+        $message = t('No shipping is required for this order. Please continue the checkout process.'); // 
       }
     }
 
@@ -274,10 +280,12 @@ function commerce_shipping_recalculate_services_submit($form, &$form_state) {
           }
         }
 
-        // Unset any cached addressfield data for this customer profile.
-        foreach ($form_state['addressfield'] as $key => $value) {
-          if (strpos($key, 'commerce_customer_profile|' . $type) === 0) {
-            unset($form_state['addressfield'][$key]);
+        if (isset($form_state['addressfield'])) {
+          // Unset any cached addressfield data for this customer profile.
+          foreach ($form_state['addressfield'] as $key => $value) {
+            if (strpos($key, 'commerce_customer_profile|' . $type) === 0) {
+              unset($form_state['addressfield'][$key]);
+            }
           }
         }
       }
@@ -299,7 +307,7 @@ function commerce_shipping_recalculate_services_submit($form, &$form_state) {
   if ($rebuild) {
     // Avoid overwriting an already updated order.
     $stored_order = commerce_order_load($order->order_id);
-    if ($stored_order->changed <= $order->changed) {
+    if ($stored_order->changed < $order->changed) {
       commerce_order_save($order);
     }
     $form_state['rebuild'] = TRUE;
